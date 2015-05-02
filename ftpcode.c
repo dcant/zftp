@@ -1,0 +1,32 @@
+#include "ftpcode.h"
+
+const int FTP_CONN		=		150;
+const int FTP_SUCCESS	=		200;
+const int FTP_NOEXEC	=		202;
+const int FTP_STAT		=		211;
+const int FTP_DIR		=		212;
+const int FTP_FILE		=		213;
+const int FTP_HELP		=		214;
+const int FTP_SYS		=		215;
+const int FTP_READY		=		220;
+const int FTP_BYE		=		221;
+const int FTP_DAT_CON	=		225;
+const int FTP_DAT_CLS	=		226;
+const int FTP_PASV		=		227;
+const int FTP_LOGIN		=		230;
+const int FTP_FILE_OK	=		250;
+const int FTP_DIR_OK	=		257;
+const int FTP_PASS		=		331;
+const int FTP_UNAME		=		332;
+const int FTP_FILE_PS	=		350;
+const int FTP_CLOSE		=		421;
+const int FTP_DAT_COE	=		425;
+const int FTP_CLS		=		426;
+const int FTP_NFILE		=		450;
+const int FTP_CMDE		=		500;
+const int FTP_ARGE		=		501;
+const int FTP_NEXEC		=		502;
+const int FTP_WCMD		=		503;
+const int FTP_WARG		=		504;
+const int FTP_NLOGIN	=		530;
+const int FTP_NOTALLOW	=		553;
