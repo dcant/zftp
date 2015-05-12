@@ -13,6 +13,9 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pwd.h>
+#include <sys/capability.h>
+#include <sys/prctl.h>
 
 void check_privilege()
 {
@@ -20,6 +23,29 @@ void check_privilege()
 		printf("Please run as root!\n");
 		exit(-1);
 	}
+}
+
+void drop_privilege()
+{
+	struct passwd *pw;
+	if ((pw = getpwnam("nobody")) == NULL)
+		ERROR_EXIT("getpwnam");
+
+	if (setgid(pw->pw_gid) == -1)
+		ERROR_EXIT("setgid");
+	if (seteuid(pw->pw_uid) == -1)
+		ERROR_EXIT("seteuid");
+
+	struct __user_cap_data_struct data;
+    struct __user_cap_header_struct hdr;
+    hdr.version = _LINUX_CAPABILITY_VERSION_1;
+    hdr.pid = getpid();
+    data.effective = (1 << CAP_NET_BIND_SERVICE);
+    data.permitted = (1 << CAP_NET_BIND_SERVICE);
+    data.inheritable = 0;
+
+    if(capset(&hdr, &data) == -1)
+        ERROR_EXIT("capset");
 }
 
 void set_daemon()

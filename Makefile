@@ -1,5 +1,5 @@
 CC		=	gcc
-CFLAGS	=	-I. -g
+CFLAGS	=	-I. -g -lcrypt
 
 TARGET	=	zftp
 OBJS	=	main.o hash.o utils.o tunables.o parseconf.o str.o prelogin.o connrec.o ftpcode.o\
@@ -18,7 +18,7 @@ all : testhash testparseconf
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 $(TARGET): $(OBJS) $(DEPS)
-	$(CC) -o $(TARGET) $(OBJS)
+	$(CC) -o $(TARGET) $(OBJS) $(CFLAGS)
 
 testhash: hash.h $(THO)
 	$(CC) -o testhash $(THO)

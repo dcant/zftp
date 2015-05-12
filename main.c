@@ -20,8 +20,6 @@ int main()
 
 	init_conf(conf);
 
-	set_dir_root();
-
 	init_recorder();
 
 	set_signal_child();

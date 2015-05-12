@@ -6,6 +6,7 @@
 #include "tunables.h"
 #include "err.h"
 #include "str.h"
+#include "utils.h"
 #include <string.h>
 #include <sys/types.h>
 #include <pwd.h>
@@ -46,6 +47,7 @@ void set_parent_context(session_t *sess)
 	close(sess->ctrl_fd);
 	close(sess->child_fd);
 	sess->child_fd = -1;
+	drop_privilege();
 }
 
 void handle_ftpcmd(session_t *sess)
@@ -77,7 +79,10 @@ void handle_ftpcmd(session_t *sess)
 
 void handle_childcmd(session_t *sess)
 {
-	while (1);
+//	tcp_server("192.168.1.251", 20);	// test whether drop_privilege succeed.
+	while (1) {
+		;
+	}
 }
 
 static void _reset_session_cmd(session_t *sess)
@@ -126,31 +131,30 @@ static void _handle_map(session_t *sess)
 
 static void _handle_user(session_t *sess)
 {
-	if (strlen(sess->ftp_cmd_arg) == 0) {
-		ftp_cmdio_write(sess->ctrl_fd, FTP_ARGE, "Wrong arg");
-		return;
-	}
-	char buf[MAXCMD] = {0};
-	strcpy(buf, sess->ftp_cmd_arg);
-	str_toupper(buf);
-	if (strcmp(buf, "ANONYMOUS") == 0) {
-		sess->userid = -1;
-		ftp_cmdio_write(sess->ctrl_fd, FTP_PASS, "Please specify password");
-		return;
-	}
-	struct passwd *pw = getpwnam(sess->ftp_cmd_arg);
-	if (pw == NULL) {
-		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN, "Login failed");
-		return;
-	}
-	sess->userid = pw->pw_uid;
+	if (strlen(sess->ftp_cmd_arg) != 0) {
+		char buf[MAXCMD] = {0};
+		strcpy(buf, sess->ftp_cmd_arg);
+		str_toupper(buf);
+		if (strcmp(buf, "ANONYMOUS") == 0) {
+			sess->userid = -1;
+			ftp_cmdio_write(sess->ctrl_fd, FTP_PASS, "Please specify password");
+			return;
+		}
+		struct passwd *pw = getpwnam(sess->ftp_cmd_arg);
+		if (pw == NULL)
+			sess->userid = -2;
+		else
+			sess->userid = pw->pw_uid;
+	} else
+		sess->userid = -2;
 	ftp_cmdio_write(sess->ctrl_fd, FTP_PASS, "Please specify password");
 }
 
 static void _handle_pass(session_t *sess)
 {
-	char buf[MAXCMD];
-	if (sess->userid = -1) {
+	if (sess->userid == -1) {
+		char buf[MAXCMD];
+
 		sess->is_login = 1;
 		memset(buf, 0, MAXCMD);
 		sprintf(buf, "\r\n", FTP_LOGIN);
@@ -161,27 +165,30 @@ static void _handle_pass(session_t *sess)
 		sprintf(buf, "%s\r\n%d-\r\n%d-  @zftp", buf, FTP_LOGIN, FTP_LOGIN);
 		sprintf(buf, "%s\r\n%d-\r\n%d Login successful.", buf, FTP_LOGIN,
 			FTP_LOGIN);
+
 		ftp_cmdio_write_m(sess->ctrl_fd, FTP_LOGIN, buf);
-		return;
-	} else {
+	} else if (sess->userid >= 0) {
 		struct passwd *pw = getpwuid(sess->userid);
 		if (pw == NULL) {
 			sess->userid = -2;
 			ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN, "Login failed");
 			return;
 		}
+
 		struct spwd *spw = getspnam(pw->pw_name);
 		if (spw == NULL) {
 			sess->userid = -2;
 			ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN, "Login failed");
 			return;
 		}
+
 		char *encrypt = crypt(sess->ftp_cmd_arg, spw->sp_pwdp);
 		if (encrypt == NULL || strcmp(encrypt, spw->sp_pwdp) != 0) {
 			sess->userid = -2;
 			ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN, "Login failed");
 			return;
 		}
+
 		sess->is_login = 1;
 		memset(buf, 0, MAXCMD);
 		sprintf(buf, "\r\n", FTP_LOGIN);
@@ -190,9 +197,14 @@ static void _handle_pass(session_t *sess)
 		sprintf(buf, "%s\r\n%d-\r\n%d-  @zftp", buf, FTP_LOGIN, FTP_LOGIN);
 		sprintf(buf, "%s\r\n%d-\r\n%d Login successful.", buf, FTP_LOGIN,
 			FTP_LOGIN);
+
 		ftp_cmdio_write_m(sess->ctrl_fd, FTP_LOGIN, buf);
+	} else {
+		sleep(1);
+		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN, "Login failed");
 		return;
 	}
+	set_dir_root();
 }
 
 static void _handle_port(session_t *sess)

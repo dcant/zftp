@@ -4,6 +4,7 @@
 #include <netinet/in.h>
 
 void check_privilege();
+void drop_privilege();
 void set_daemon();
 void set_dir_root();
 
