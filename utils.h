@@ -13,15 +13,15 @@ int tcp_client(const char *addr, int port);
 int connect_timeout(int sockfd, struct sockaddr_in *addr, int secs);
 int accept_timeout(int sockfd, struct sockaddr_in *addr, int secs);
 
-int readn(int fd, char *buf, int n);
-int writen(int fd, const char *buf, int n);
+int readn(int fd, void *buf, int n);
+int writen(int fd, const void *buf, int n);
 
 int rlock_file(int fd);	//read lock
 int wlock_file(int fd);	//write lock
 int unlock_file(int fd);
 
-int send_fd(int fd, int sfd);
-int recv_fd(int fd, int *rfd);
+void send_fd(int fd, int sfd);
+int recv_fd(int fd);
 
 int recv_peek(int fd, void *buf, int n);
 

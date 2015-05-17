@@ -10,7 +10,7 @@
 
 void init_session(session_t *sess)
 {
-	sess->mode = 0;	// 0 -> bin  1 -> ascii
+	sess->tmode = 0;	// 0 -> bin  1 -> ascii
 	sess->userid = -2;	// -1 represent anonymous
 
 	sess->ctrl_fd = -1;

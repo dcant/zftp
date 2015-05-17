@@ -5,6 +5,8 @@
 #include "tunables.h"
 #include "ftpcmdio.h"
 #include "ftpcode.h"
+#include "utils.h"
+#include "prelogin.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <sys/wait.h>

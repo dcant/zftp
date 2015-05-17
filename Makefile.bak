@@ -1,13 +1,12 @@
 CC		=	gcc
-
-ifndef CFLAGS
-	CFLAGS = -MMD -Wall -g
-endif
-CFLAGS	+=	-I. -lcrypt
+CFLAGS	=	-I. -g -lcrypt
 
 TARGET	=	zftp
 OBJS	=	main.o hash.o utils.o tunables.o parseconf.o str.o prelogin.o connrec.o ftpcode.o\
 			ftpcmdio.o privsock.o process.o zsignal.o privops.o
+
+DEPS	=	hash.h utils.h tunables.h session.h connrec.h parseconf.h str.h ftpcode.h err.h\
+			prelogin.h privops.h
 
 TPO		= 	testparseconf.o parseconf.o str.o tunables.o utils.o
 THO		= 	testhash.o hash.o
@@ -15,29 +14,24 @@ THO		= 	testhash.o hash.o
 all : $(TARGET)
 .PHONY : all
 
-include $(SRCS: .o=.d)
+.c.o:
+	$(CC) -c $(CFLAGS) -o $@ $<
 
-%.d: %.c
-	@set -e; rm -f $@;\
-	$(CC) $(CFLAGS) $< > $@.$$$$;\
-	sed 's,\($*\)\.o[:]*,\1.o $@:,g' < $@.$$$$ > $@;\
-	rm -f $@.$$$$
-
-$(TARGET): $(OBJS)
+$(TARGET): $(OBJS) $(DEPS)
 	$(CC) -o $(TARGET) $(OBJS) $(CFLAGS)
 
 *.o: Makefile
 
-testhash: $(THO)
+testhash: hash.h $(THO)
 	$(CC) -o testhash $(THO)
 
-testparseconf: $(TPO)
+testparseconf: parseconf.h tunables.h $(TPO)
 	$(CC) -o testparseconf $(TPO)
 
 
 .PHONY : clean cleanall
 clean:
-	-rm -f *.o $(TARGET) *.d
+	-rm -f *.o $(TARGET)
 
 cleanall:
-	-rm -f *.o $(TARGET) *.d testhash testparseconf
+	-rm -f *.o $(TARGET) testhash testparseconf

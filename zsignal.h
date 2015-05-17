@@ -15,6 +15,6 @@ void set_signal_urg();
 void enable_signal_urg(int fd);
 void enable_msg_oobinline(int fd);
 
-void starat_signal_alarm_ctrl();
+void start_signal_alarm_ctrl();
 
 #endif

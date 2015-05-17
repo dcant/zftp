@@ -33,7 +33,6 @@ static unsigned int _initialhashfunc(void *key)
 {
 	char *str = (char *)key;
 	unsigned int hash = 5381;
-	int i = 0;
 	while (*str != '\0') {
 		hash += ((hash << 5) + hash) + *str;
 		str++;
@@ -194,7 +193,7 @@ void hash_remove_entry(hashdict_t *dict, void *key, int keysize)
 	}
 }
 
-void *hash_destroy(hashdict_t *dict)
+void hash_destroy(hashdict_t *dict)
 {
 	int num = dict->rehashing ? 2 : 1;
 	int i, pos;
@@ -219,7 +218,7 @@ void *hash_destroy(hashdict_t *dict)
 
 void printhash(hashdict_t *dict)
 {
-	int pos = 0, i, j;
+	int pos = 0, i;
 	hashentry_t *entry;
 	int num = dict->rehashing ? 2 : 1;
 	for (i = 0; i < num; i++) {

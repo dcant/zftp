@@ -64,7 +64,8 @@ void set_daemon()
 		ERROR_EXIT("fork");
 	else if (pid > 0)
 		exit(0);
-	chdir("/tmp");
+	if (chdir("/tmp") < 0)
+		ERROR_EXIT("chdir");
 	umask(0);
 	for (i = 0; i <	NOFILE; i++)
 		close(i);
@@ -72,8 +73,10 @@ void set_daemon()
 
 void set_dir_root()
 {
-	chroot(tunable_dir_root);
-	chdir("/");
+	if (chroot(tunable_dir_root) < 0)
+		ERROR_EXIT("chroot");
+	if (chdir("/") < 0)
+		ERROR_EXIT("chdir");
 }
 
 int tcp_server(const char *addr, int port)
@@ -163,10 +166,10 @@ int accept_timeout(int sockfd, struct sockaddr_in *addr, int secs)
 	return ret;
 }
 
-int readn(int fd, char *buf, int n)
+int readn(int fd, void *buf, int n)
 {
 	int left = n, rd = 0;
-	char *p = buf;
+	char *p = (char *)buf;
 	while (left > 0) {
 		if ((rd = read(fd, p, left)) < 0) {
 			if (errno == EINTR)
@@ -182,10 +185,10 @@ int readn(int fd, char *buf, int n)
 	return n - left;
 }
 
-int writen(int fd, const char *buf, int n)
+int writen(int fd, const void *buf, int n)
 {
 	int left = n, wr = 0;
-	const char *p = buf;
+	const char *p = (char *)buf;
 	while (left > 0) {
 		if ((wr = write(fd, p, left)) < 0) {
 			if (errno == EINTR)
@@ -237,7 +240,7 @@ int unlock_file(int fd)
 	return lock_file(fd, F_UNLCK);
 }
 
-int send_fd(int fd, int sfd)
+void send_fd(int fd, int sfd)
 {
 	struct msghdr msg;
 	struct cmsghdr *cmptr;
@@ -262,12 +265,22 @@ int send_fd(int fd, int sfd)
 	cmptr->cmsg_len = CMSG_LEN(sizeof(sfd));
 	cmptr->cmsg_level = SOL_SOCKET;
 	cmptr->cmsg_type = SCM_RIGHTS;
-	*((int *)CMSG_DATA(cmptr)) = sfd;
 
-	return sendmsg(fd, &msg, 0);
+	union {
+		char cs[4];
+		int n;
+	} data_union;
+
+	data_union.n = sfd;
+	memcpy(CMSG_DATA(CMSG_FIRSTHDR(&msg)), data_union.cs, sizeof(int));
+
+//	*((int *)CMSG_DATA(cmptr)) = sfd;
+
+	if (sendmsg(fd, &msg, 0) != 1)
+		ERROR_EXIT("sendmsg");
 }
 
-int recv_fd(int fd, int *rsd)
+int recv_fd(int fd)
 {
 	int ret;
 	struct msghdr msg;
@@ -276,7 +289,7 @@ int recv_fd(int fd, int *rsd)
 	char c;
 	union {
 		struct cmsghdr cm;
-		char control[CMSG_SPACE(sizeof(*rsd))];
+		char control[CMSG_SPACE(sizeof(int))];
 	} control_union;
 
 	iov[0].iov_base = &c;
@@ -288,18 +301,24 @@ int recv_fd(int fd, int *rsd)
 	msg.msg_control = control_union.control;
 	msg.msg_controllen = sizeof(control_union.control);
 	msg.msg_flags = 0;
-	*((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg))) = -1;
+	union {
+		char cs[4];
+		int n;
+	} data_union;
+	data_union.n = -1;
+//	*((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg))) = -1;
+	memcpy(CMSG_DATA(CMSG_FIRSTHDR(&msg)), data_union.cs, sizeof(int));
 
 	ret = recvmsg(fd, &msg, 0);
 	if (ret != 1)
-		return ret;
+		ERROR_EXIT("recvmsg");
 
 	cmptr = CMSG_FIRSTHDR(&msg);
 	if (cmptr == NULL)
-		return -1;
-	*rsd = *((int *)CMSG_DATA(cmptr));
-
-	return ret;
+		ERROR_EXIT("recvmsg");
+	memcpy(data_union.cs, CMSG_DATA(CMSG_FIRSTHDR(&msg)), sizeof(int));
+	return data_union.n;
+//	return *((int *)CMSG_DATA(cmptr));
 }
 
 int recv_peek(int fd, void *buf, int n)

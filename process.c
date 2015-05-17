@@ -7,13 +7,14 @@
 #include "err.h"
 #include "str.h"
 #include "utils.h"
+#include "privops.h"
+#include "privsock.h"
 #include <string.h>
 #include <sys/types.h>
 #include <pwd.h>
 #include <shadow.h>
 #include <crypt.h>
 #include <unistd.h>
-
 #include <stdio.h>
 
 static void _reset_session_cmd(session_t *sess);
@@ -81,7 +82,26 @@ void handle_childcmd(session_t *sess)
 {
 //	tcp_server("192.168.1.251", 20);	// test whether drop_privilege succeed.
 	while (1) {
-		;
+/*		char cmd = priv_sock_recv_cmd(sess->parent_fd);
+		switch (cmd) {
+		case PRIV_SOCK_CHECK:
+			priv_op_check(sess);
+			break;
+		case PRIV_SOCK_CLOSE:
+			priv_op_close(sess);
+			break;
+		case PRIV_SOCK_LISTEN:
+			priv_op_listen(sess);
+			break;
+		case PRIV_SOCK_ACCEPT:
+			priv_op_accept(sess);
+			break;
+		case PRIV_SOCK_GET:
+			priv_op_get(sess);
+			break;
+		default:
+			ERROR_EXIT("handle_childcmd");
+		}*/;
 	}
 }
 
@@ -152,12 +172,11 @@ static void _handle_user(session_t *sess)
 
 static void _handle_pass(session_t *sess)
 {
+	char buf[MAXCMD];
 	if (sess->userid == -1) {
-		char buf[MAXCMD];
-
 		sess->is_login = 1;
 		memset(buf, 0, MAXCMD);
-		sprintf(buf, "\r\n", FTP_LOGIN);
+		sprintf(buf, "\r\n");
 		sprintf(buf, "%s%d-  Max %d connections a IP", buf, FTP_LOGIN,
 			tunable_max_conn_per_ip);
 		sprintf(buf, "%s\r\n%d-\r\n%d-  Only download permitted.", buf,
@@ -191,7 +210,7 @@ static void _handle_pass(session_t *sess)
 
 		sess->is_login = 1;
 		memset(buf, 0, MAXCMD);
-		sprintf(buf, "\r\n", FTP_LOGIN);
+		sprintf(buf, "%d\r\n", FTP_LOGIN);
 		sprintf(buf, "%s%d-  Max %d connections a IP", buf, FTP_LOGIN,
 			tunable_max_conn_per_ip);
 		sprintf(buf, "%s\r\n%d-\r\n%d-  @zftp", buf, FTP_LOGIN, FTP_LOGIN);
@@ -201,7 +220,7 @@ static void _handle_pass(session_t *sess)
 		ftp_cmdio_write_m(sess->ctrl_fd, FTP_LOGIN, buf);
 	} else {
 		sleep(1);
-		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN, "Login failed");
+		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN, "Login failed.");
 		return;
 	}
 	set_dir_root();
@@ -209,12 +228,45 @@ static void _handle_pass(session_t *sess)
 
 static void _handle_port(session_t *sess)
 {
+	// first check whether pasv or port mode is on, 0->null, 1->pasv, 2->port
+	priv_sock_send_cmd(sess->child_fd, PRIV_SOCK_CHECK);
+	int res = priv_sock_recv_res(sess->child_fd);
+	if (res == 0 || res == 1) {
+		if (res == 1) {
+			priv_sock_send_cmd(sess->child_fd, PRIV_SOCK_CLOSE);
+			if (priv_sock_recv_res(sess->child_fd) == -1)
+				ftp_cmdio_write(sess->ctrl_fd, FTP_NEXEC, "Port not succeed.");
+			close(sess->data_fd);
+			sess->data_fd = -1;
+		}
 
+		char c[6] = {0};
+		if (sscanf(sess->ftp_cmd_arg, "%c, %c, %c, %c, %c, %c", &c[0], &c[1], &c[2],
+			&c[3], &c[4], &c[5]) != 6) {
+			ftp_cmdio_write(sess->ctrl_fd, FTP_ARGE, "Argument error.");
+			return;
+		}
+
+		sess->cliaddr = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
+		memset(sess->cliaddr, 0, sizeof(struct sockaddr_in));
+
+		char *ip = (char *)&sess->cliaddr->sin_addr.s_addr;
+		ip[0] = c[0];
+		ip[1] = c[1];
+		ip[2] = c[2];
+		ip[3] = c[3];
+
+		char *port = (char *)&sess->cliaddr->sin_port;
+		port[0] = c[5];
+		port[1] = c[4];
+	}
+
+	ftp_cmdio_write(sess->ctrl_fd, FTP_SUCCESS, "Port command successful.");
 }
 
 static void _handle_pasv(session_t *sess)
 {
-
+	priv_sock_send_cmd(sess->parent_fd, PRIV_SOCK_CHECK);
 }
 
 static void _handle_type(session_t *sess)

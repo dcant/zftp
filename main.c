@@ -10,6 +10,7 @@
 #include "parseconf.h"
 #include "connrec.h"
 #include "zsignal.h"
+#include "prelogin.h"
 
 const char *conf = "ftp.conf";
 

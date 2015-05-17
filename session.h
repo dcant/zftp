@@ -8,7 +8,7 @@
 struct sockaddr_in;
 
 typedef struct session {
-	int mode;	// 0 -> bin  1 -> ascii
+	int tmode;	// 0 -> bin  1 -> ascii
 	int userid;
 
 	int ctrl_fd;
