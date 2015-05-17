@@ -16,6 +16,8 @@
 #include <crypt.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <arpa/inet.h>
+#include <stdint.h>
 
 static void _reset_session_cmd(session_t *sess);
 static void _handle_map(session_t *sess);
@@ -82,7 +84,7 @@ void handle_childcmd(session_t *sess)
 {
 //	tcp_server("192.168.1.251", 20);	// test whether drop_privilege succeed.
 	while (1) {
-/*		char cmd = priv_sock_recv_cmd(sess->parent_fd);
+		char cmd = priv_sock_recv_cmd(sess->parent_fd);
 		switch (cmd) {
 		case PRIV_SOCK_CHECK:
 			priv_op_check(sess);
@@ -101,7 +103,7 @@ void handle_childcmd(session_t *sess)
 			break;
 		default:
 			ERROR_EXIT("handle_childcmd");
-		}*/;
+		}
 	}
 }
 
@@ -228,50 +230,86 @@ static void _handle_pass(session_t *sess)
 
 static void _handle_port(session_t *sess)
 {
-	// first check whether pasv or port mode is on, 0->null, 1->pasv, 2->port
+	// first check whether pasv is on, 0->null, 1->pasv
 	priv_sock_send_cmd(sess->child_fd, PRIV_SOCK_CHECK);
 	int res = priv_sock_recv_res(sess->child_fd);
-	if (res == 0 || res == 1) {
-		if (res == 1) {
-			priv_sock_send_cmd(sess->child_fd, PRIV_SOCK_CLOSE);
-			if (priv_sock_recv_res(sess->child_fd) == -1)
-				ftp_cmdio_write(sess->ctrl_fd, FTP_NEXEC, "Port not succeed.");
-			close(sess->data_fd);
-			sess->data_fd = -1;
-		}
-
-		char c[6] = {0};
-		if (sscanf(sess->ftp_cmd_arg, "%c, %c, %c, %c, %c, %c", &c[0], &c[1], &c[2],
-			&c[3], &c[4], &c[5]) != 6) {
-			ftp_cmdio_write(sess->ctrl_fd, FTP_ARGE, "Argument error.");
-			return;
-		}
-
-		sess->cliaddr = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
-		memset(sess->cliaddr, 0, sizeof(struct sockaddr_in));
-
-		char *ip = (char *)&sess->cliaddr->sin_addr.s_addr;
-		ip[0] = c[0];
-		ip[1] = c[1];
-		ip[2] = c[2];
-		ip[3] = c[3];
-
-		char *port = (char *)&sess->cliaddr->sin_port;
-		port[0] = c[5];
-		port[1] = c[4];
+	if (res == 1) {
+		priv_sock_send_cmd(sess->child_fd, PRIV_SOCK_CLOSE);
+		if (priv_sock_recv_res(sess->child_fd) == -1)
+			ftp_cmdio_write(sess->ctrl_fd, FTP_NEXEC, "Port not succeed.");
+		close(sess->data_fd);
+		sess->data_fd = -1;
 	}
+
+	if (sess->cliaddr != NULL) {
+		free(sess->cliaddr);
+		sess->cliaddr = NULL;
+	}
+
+	char c[6] = {0};
+	if (sscanf(sess->ftp_cmd_arg, "%c,%c,%c,%c,%c,%c", &c[0], &c[1], &c[2],
+		&c[3], &c[4], &c[5]) != 6) {
+		ftp_cmdio_write(sess->ctrl_fd, FTP_ARGE, "Argument error.");
+		return;
+	}
+
+	sess->cliaddr = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
+	memset(sess->cliaddr, 0, sizeof(struct sockaddr_in));
+
+	char *ip = (char *)&sess->cliaddr->sin_addr.s_addr;
+	ip[0] = c[0];
+	ip[1] = c[1];
+	ip[2] = c[2];
+	ip[3] = c[3];
+
+	char *port = (char *)&sess->cliaddr->sin_port;
+	port[0] = c[5];
+	port[1] = c[4];
 
 	ftp_cmdio_write(sess->ctrl_fd, FTP_SUCCESS, "Port command successful.");
 }
 
 static void _handle_pasv(session_t *sess)
 {
-	priv_sock_send_cmd(sess->parent_fd, PRIV_SOCK_CHECK);
+	if (sess->cliaddr != NULL) {
+		free(sess->cliaddr);
+		sess->cliaddr = NULL;
+	}
+
+	priv_sock_send_cmd(sess->child_fd, PRIV_SOCK_LISTEN);
+
+	uint16_t port = priv_sock_recv_int(sess->child_fd);
+	char c[6] = {0};
+	union {
+		char cs[2];
+		uint16_t nport;
+	} port_union;
+	port_union.nport = htons(port);
+	c[4] = port_union.cs[1];
+	c[5] = port_union.cs[0];
+	sscanf(tunable_listen_addr, "%c.%c.%c.%c", &c[0], &c[1], &c[2], &c[3]);
+
+	char msg[1024] = {0};
+	sprintf(msg, "Entering Passive Mode (%c,%c,%c,%c,%c,%c).", c[0], c[1],
+		c[2], c[3], c[4], c[5]);
+	ftp_cmdio_write(sess->ctrl_fd, FTP_PASV, msg);
 }
 
 static void _handle_type(session_t *sess)
 {
-
+	if (strcmp(sess->ftp_cmd_arg, "I") == 0) {
+		sess->tmode = 0;
+		ftp_cmdio_write(sess->ctrl_fd, FTP_SUCCESS,
+			"Switching to Binary mode.");
+	} else if (strcmp(sess->ftp_cmd_arg, "A") == 0) {
+		sess->tmode = 1;
+		ftp_cmdio_write(sess->ctrl_fd, FTP_SUCCESS,
+			"Switching to ASCII mode.");
+	} else {
+		char msg[1024] = {0};
+		sprintf(msg, "%s: Unknown mode.", sess->ftp_cmd_arg);
+		ftp_cmdio_write(sess->ctrl_fd, FTP_ARGE, msg);
+	}
 }
 
 static void _handle_mode(session_t *sess)
@@ -306,7 +344,7 @@ static void _handle_abor(session_t *sess)
 
 static void _handle_quit(session_t *sess)
 {
-	ftp_cmdio_write(sess->ctrl_fd, FTP_BYE, "Bye.");
+	ftp_cmdio_write(sess->ctrl_fd, FTP_BYE, "GoodBye.");
 	close(sess->ctrl_fd);
 	exit(0);
 }
