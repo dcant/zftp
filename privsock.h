@@ -22,4 +22,7 @@ int priv_sock_recv_int(int fd);
 void priv_sock_send_str(int fd, const char *str, int len);
 void priv_sock_recv_str(int fd, char *buf, int len);
 
+void priv_sock_send_fd(int fd, int sfd);
+int priv_sock_recv_fd(int fd);
+
 #endif

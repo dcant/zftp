@@ -16,6 +16,7 @@
 session_t *ps;
 static void _signal_alarm_ctrl_handler(int);
 static void _signal_urg_handler(int);
+static void _signal_data_handler(int);
 
 sighandler_t zsignal(int signum, sighandler_t handler)
 {
@@ -47,7 +48,7 @@ static void _signal_alarm_ctrl_handler(int sig)
 {
 	if (tunable_ctrl_conn_idle_time > 0) {
 		shutdown(ps->ctrl_fd, SHUT_RD);
-		ftp_cmdio_write(ps->ctrl_fd, FTP_CLOSE, "Connection timeout");
+		ftp_cmdio_write(ps->ctrl_fd, FTP_CLOSE, "Timeout");
 		shutdown(ps->ctrl_fd, SHUT_WR);
 		exit(0);
 	}
@@ -90,4 +91,27 @@ void enable_msg_oobinline(int fd)
 void start_signal_alarm_ctrl()
 {
 	alarm(tunable_ctrl_conn_idle_time);
+}
+
+static void _signal_data_handler(int sig)
+{
+	if (tunable_data_conn_idle_time > 0) {
+		if (ps->is_transmitting) {
+			start_signal_alarm_data();
+		} else {
+			close(ps->data_fd);
+			shutdown(ps->ctrl_fd, SHUT_RD);
+			ftp_cmdio_write(ps->ctrl_fd, FTP_CLOSE, "Timeout.");
+		}
+	}
+}
+
+void set_signal_alarm_data()
+{
+	zsignal(SIGALRM, _signal_data_handler);
+}
+
+void start_signal_alarm_data()
+{
+	alarm(tunable_data_conn_idle_time);
 }

@@ -123,6 +123,7 @@ static cmd_t map[] =
 {
 	{"USER", _handle_user},
 	{"PASS", _handle_pass},
+	{"QUIT", _handle_quit},
 	{"PORT", _handle_port},
 	{"PASV", _handle_pasv},
 	{"TYPE", _handle_type},
@@ -132,8 +133,7 @@ static cmd_t map[] =
 	{"STOR", _handle_stor},
 	{"NOOP", _handle_noop},
 	{"ABOR", _handle_abor},
-	{"\377\364\377\362ABOR", _handle_abor},
-	{"QUIT", _handle_quit}
+	{"\377\364\377\362ABOR", _handle_abor}
 };
 
 static void _handle_map(session_t *sess)
@@ -144,7 +144,8 @@ static void _handle_map(session_t *sess)
 			if (map[i].handler != NULL)
 				map[i].handler(sess);
 			else
-				ftp_cmdio_write(sess->ctrl_fd, FTP_NEXEC, "Unimplemented cmd");
+				ftp_cmdio_write(sess->ctrl_fd, FTP_NEXEC,
+					"Unimplemented cmd");
 			return;
 		}
 	}
@@ -159,7 +160,8 @@ static void _handle_user(session_t *sess)
 		str_toupper(buf);
 		if (strcmp(buf, "ANONYMOUS") == 0) {
 			sess->userid = -1;
-			ftp_cmdio_write(sess->ctrl_fd, FTP_PASS, "Please specify password");
+			ftp_cmdio_write(sess->ctrl_fd, FTP_PASS,
+				"Please specify password");
 			return;
 		}
 		struct passwd *pw = getpwnam(sess->ftp_cmd_arg);
@@ -221,7 +223,7 @@ static void _handle_pass(session_t *sess)
 
 		ftp_cmdio_write_m(sess->ctrl_fd, FTP_LOGIN, buf);
 	} else {
-		sleep(1);
+		sleep(2);
 		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN, "Login failed.");
 		return;
 	}
@@ -230,6 +232,12 @@ static void _handle_pass(session_t *sess)
 
 static void _handle_port(session_t *sess)
 {
+	if (!sess->is_login) {
+		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN,
+			"Please login first.");
+		return;
+	}
+
 	// first check whether pasv is on, 0->null, 1->pasv
 	priv_sock_send_cmd(sess->child_fd, PRIV_SOCK_CHECK);
 	int res = priv_sock_recv_res(sess->child_fd);
@@ -271,6 +279,12 @@ static void _handle_port(session_t *sess)
 
 static void _handle_pasv(session_t *sess)
 {
+	if (!sess->is_login) {
+		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN,
+			"Please login first.");
+		return;
+	}
+
 	if (sess->cliaddr != NULL) {
 		free(sess->cliaddr);
 		sess->cliaddr = NULL;
@@ -297,6 +311,12 @@ static void _handle_pasv(session_t *sess)
 
 static void _handle_type(session_t *sess)
 {
+	if (!sess->is_login) {
+		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN,
+			"Please login first.");
+		return;
+	}
+
 	if (strcmp(sess->ftp_cmd_arg, "I") == 0) {
 		sess->tmode = 0;
 		ftp_cmdio_write(sess->ctrl_fd, FTP_SUCCESS,
@@ -314,27 +334,55 @@ static void _handle_type(session_t *sess)
 
 static void _handle_mode(session_t *sess)
 {
+	if (!sess->is_login) {
+		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN,
+			"Please login first.");
+		return;
+	}
 
+	ftp_cmdio_write(sess->ctrl_fd, FTP_ARGE, "Only stream mode supported.");
 }
 
 static void _handle_stru(session_t *sess)
 {
-
+	if (!sess->is_login) {
+		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN,
+			"Please login first.");
+		return;
+	}
+	if (sess->userid == -1) {
+		ftp_cmdio_write(sess->ctrl_fd, FTP_NEXEC,
+			"You have no permission to write.");
+		return;
+	}
 }
 
 static void _handle_retr(session_t *sess)
 {
-
+	if (!sess->is_login) {
+		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN,
+			"Please login first.");
+		return;
+	}
 }
 
 static void _handle_stor(session_t *sess)
 {
-
+	if (!sess->is_login) {
+		ftp_cmdio_write(sess->ctrl_fd, FTP_NLOGIN,
+			"Please login first.");
+		return;
+	}
+	if (sess->userid == -1) {
+		ftp_cmdio_write(sess->ctrl_fd, FTP_NEXEC,
+			"You have no permission to write.");
+		return;
+	}
 }
 
 static void _handle_noop(session_t *sess)
 {
-
+	ftp_cmdio_write(sess->ctrl_fd, FTP_SUCCESS, "");
 }
 
 static void _handle_abor(session_t *sess)

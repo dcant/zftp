@@ -7,7 +7,7 @@ CFLAGS	+=	-I. -lcrypt
 
 TARGET	=	zftp
 OBJS	=	main.o hash.o utils.o tunables.o parseconf.o str.o prelogin.o connrec.o ftpcode.o\
-			ftpcmdio.o privsock.o process.o zsignal.o privops.o
+			ftpcmdio.o privsock.o process.o zsignal.o privops.o transfer.o
 
 TPO		= 	testparseconf.o parseconf.o str.o tunables.o utils.o
 THO		= 	testhash.o hash.o
