@@ -24,12 +24,14 @@ extern const int FTP_CLOSE;
 extern const int FTP_DAT_COE;
 extern const int FTP_CLS;
 extern const int FTP_NFILE;
+extern const int FTP_LOCALE;
 extern const int FTP_CMDE;
 extern const int FTP_ARGE;
 extern const int FTP_NEXEC;
 extern const int FTP_WCMD;
 extern const int FTP_WARG;
 extern const int FTP_NLOGIN;
+extern const int FTP_FILEE;
 extern const int FTP_NOTALLOW;
 
 #endif

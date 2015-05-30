@@ -23,7 +23,7 @@ typedef struct session {
 	int is_transmitting;
 	int is_abor_recved;
 
-	long long retr_pos;	// retrieve position
+	long long re_pos;	// restart position
 
 	int clients_num;
 	int ip_client_num;

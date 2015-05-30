@@ -25,7 +25,7 @@ void init_session(session_t *sess)
 	sess->is_transmitting = 0;
 	sess->is_abor_recved = 0;
 
-	sess->retr_pos = 0;	// retrieve position
+	sess->re_pos = 0;	// restart position
 
 	sess->clients_num = 0;
 	sess->ip_client_num = 0;

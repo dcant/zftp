@@ -317,11 +317,14 @@ static void _handle_type(session_t *sess)
 		return;
 	}
 
-	if (strcmp(sess->ftp_cmd_arg, "I") == 0) {
+	if (strcmp(sess->ftp_cmd_arg, "I") == 0 ||
+		strcmp(sess->ftp_cmd_arg, "L8") == 0 ||
+		strcmp(sess->ftp_cmd_arg, "L 8") == 0) {
 		sess->tmode = 0;
 		ftp_cmdio_write(sess->ctrl_fd, FTP_SUCCESS,
 			"Switching to Binary mode.");
-	} else if (strcmp(sess->ftp_cmd_arg, "A") == 0) {
+	} else if (strcmp(sess->ftp_cmd_arg, "A") == 0 ||
+		strcmp(sess->ftp_cmd_arg, "A N") == 0) {
 		sess->tmode = 1;
 		ftp_cmdio_write(sess->ctrl_fd, FTP_SUCCESS,
 			"Switching to ASCII mode.");
